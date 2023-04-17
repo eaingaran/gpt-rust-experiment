@@ -1,0 +1,199 @@
+mod openai_chat;
+
+use openai_chat::{ChatMessage, Model, OpenAPI};
+use web_sys::HtmlInputElement;
+use yew::prelude::*;
+
+use yew_bootstrap::component::*;
+use yew_bootstrap::util::*;
+
+#[derive(Debug)]
+struct Chat {
+    api_key: String,
+    system_message: String,
+    model: String,
+    messages: Vec<ChatMessage>,
+    message_input: String,
+    openai_api: Option<OpenAPI>,
+}
+
+// Define the messages that the app can receive
+enum Msg {
+    UpdateAPIKey(InputEvent),
+    UpdateModel(InputEvent),
+    UpdateSystemPrompt(InputEvent),
+    StartChat,
+    ClearChat,
+    SendMessage,
+    UpdateInput(InputEvent),
+    KeyPressInput(KeyboardEvent),
+}
+
+// Implement the app component
+impl Component for Chat {
+    type Message = Msg;
+    type Properties = ();
+
+    fn create(_ctx: &Context<Self>) -> Self {
+        print!("{_ctx:#?}");
+        Chat {
+            api_key: String::new(),
+            model: Model::Gpt3_5Turbo.to_string(),
+            system_message: "You are a friendly assistant.".to_string(),
+            messages: Vec::new(),
+            message_input: String::new(),
+            openai_api: None,
+        }
+    }
+
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            Msg::StartChat => {
+                let api_key = self.api_key.clone();
+                print!("API Key is '{api_key}'");
+                let model = self.model.clone();
+                print!("Model is '{model}'");
+                let system_message = self.system_message.clone();
+                print!("System prompt is '{system_message}'");
+                // create open api object here
+                self.openai_api = Some(OpenAPI::new(
+                    self.api_key.clone(),
+                    self.model.clone(),
+                    self.system_message.clone(),
+                ));
+                true
+            }
+            Msg::SendMessage => {
+                let message = self.message_input.clone();
+                if message.is_empty() {
+                    self.message_input.clear();
+                    return false;
+                }
+
+                self.messages.push(ChatMessage {
+                    role: "user".to_owned(),
+                    content: message.clone(),
+                });
+                self.message_input.clear();
+
+                if self.openai_api.is_some() {
+                    let response = self.openai_api.as_mut().unwrap().chat(message);
+                    //self.messages.push(response);
+                } else {
+                    self.messages.push(ChatMessage { role: "rust".to_owned(), content: "Chat with openai API not started. Use the 'Start chat' button to get started".to_owned() });
+                }
+                true
+            }
+            Msg::KeyPressInput(input) => {
+                if input.key() == "Enter" {
+                    let message = self.message_input.clone();
+                    if message.is_empty() {
+                        self.message_input.clear();
+                        return false;
+                    }
+                    self.messages.push(ChatMessage {
+                        role: "user".to_owned(),
+                        content: message.clone(),
+                    });
+                    self.message_input.clear();
+
+                    if self.openai_api.is_some() {
+                        let response = self.openai_api.as_mut().unwrap().chat(message);
+                        
+                        //self.messages.push(response);
+                    } else {
+                        self.messages.push(ChatMessage { role: "rust".to_owned(), content: "Chat with openai API not started. Use the 'Start chat' button to get started".to_owned() });
+                    }
+                }
+                true
+            }
+            Msg::ClearChat => {
+                self.messages.clear();
+                if self.openai_api.is_some() {
+                    self.openai_api.as_mut().unwrap().clear_chat();
+                }
+                true
+            }
+            Msg::UpdateInput(input) => {
+                let input_el: HtmlInputElement = input.target_unchecked_into();
+                let value: String = input_el.value();
+                self.message_input = value;
+                false
+            }
+            Msg::UpdateAPIKey(input) => {
+                let input_el: HtmlInputElement = input.target_unchecked_into();
+                let value: String = input_el.value();
+                self.api_key = value;
+                true
+            }
+            Msg::UpdateModel(input) => {
+                let input_el: HtmlInputElement = input.target_unchecked_into();
+                let value: String = input_el.value();
+                self.model = value;
+                true
+            }
+            Msg::UpdateSystemPrompt(input) => {
+                let input_el: HtmlInputElement = input.target_unchecked_into();
+                let value: String = input_el.value();
+                self.system_message = value;
+                true
+            }
+        }
+    }
+
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let link = ctx.link();
+        html! {
+            <>
+            {include_inline()}
+            {include_cdn_icons()}
+            <div id="layout" class="p-3">
+                <h1>{"Chat GPT"}</h1>
+                <br/>
+                <Container>
+                   <strong style="text-align:left;width: 20%;">{"OpenAI Key\u{00a0}\u{00a0}\u{00a0}"}</strong><input style="text-align:center;width: 60%;" type="password" value={self.api_key.clone()} placeholder="<YOUR-API-KEY>"
+                        oninput={link.callback(|e: InputEvent| Msg::UpdateAPIKey(e))}
+                    />
+                </Container>
+                <Container>
+                    <strong style="text-align:left;width: 20%;">{"GPT Model\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</strong><input style="text-align:center;width: 60%;" type="text" value={self.model.clone()}
+                        oninput={link.callback(|e: InputEvent| Msg::UpdateModel(e))}
+                    />
+                    <button style="text-align:center;width: 20%;"  class="btn-primary" onclick={link.callback(|_| Msg::StartChat)}>{"Start chat"}</button>
+                </Container>
+                <Container>
+                    <strong style="text-align:left;width: 20%;">{"System Text\u{00a0}\u{00a0}"}</strong><input style="text-align:center;width: 60%;" type="text" value={self.system_message.clone()}
+                        oninput={link.callback(|e: InputEvent| Msg::UpdateSystemPrompt(e))}
+                    />
+                    <button style="text-align:center;width: 20%;"  class="btn-primary" onclick={link.callback(|_| Msg::ClearChat)}>{"Clear chat"}</button>
+                </Container>
+                <br/>
+                <Container class="bg-light">
+                    <div style="height:60%;overflow:auto;">
+                    <ul style="list-style-type:none;">
+                    <br/>
+                        { for self.messages.iter().map(|msg| html! { <li>{&msg.role}{": "}{&msg.content} </li>}) }
+                        <br/>
+                    </ul>
+                    </div>
+                </Container>
+                <br/>
+                <Container>
+                <input style="text-align:center;width: 90%;" type="text" id="chat" value={self.message_input.clone()} placeholder="Enter your prompt here..."
+                oninput={link.callback(|e: InputEvent| Msg::UpdateInput(e))} onkeypress={link.callback(|e: KeyboardEvent| Msg::KeyPressInput(e))}
+                />
+                <button id="send" style="text-align:center;width: 10%;"  class="btn-primary" onclick={link.callback(|_| Msg::SendMessage)}>{"Send"}</button>
+                </Container>
+
+            </div>
+                { include_cdn_js() }
+                </>
+        }
+    }
+}
+
+fn main() {
+    wasm_logger::init(wasm_logger::Config::default());
+    log::debug!("App is starting");
+    yew::Renderer::<Chat>::new().render();
+}

@@ -1,0 +1,39 @@
+mod openai_chat;
+
+use openai_chat::OpenAPI;
+use openai_chat::Model;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut open_api = OpenAPI::new(
+        "".to_string(),
+        Model::Gpt3_5Turbo,
+        "You are a pirate friend of mine, you are mostly helpful, but a little sarcastic".to_string()
+    );
+
+    let response = open_api.chat("What is the height of the Eiffel tower? matey".to_string()).await;
+
+    print!("{response:#?}");
+
+    let response = open_api.chat("How much does it weight?".to_string()).await;
+
+    print!("{response:#?}");
+
+    println!();
+    println!();
+    let messages = open_api.messages.clone();
+    print!("{messages:#?}");
+
+    open_api.clear_chat();
+
+    let response = open_api.chat("How much does it weight again?".to_string()).await;
+
+    print!("{response:#?}");
+
+    println!();
+    println!();
+    let messages = open_api.messages;
+    print!("{messages:#?}");
+
+    Ok(())
+}

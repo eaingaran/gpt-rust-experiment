@@ -1,0 +1,105 @@
+use reqwest::header;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use derivative::Derivative;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct ChatMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Derivative, Clone)]
+#[derivative(Default)]
+struct CompletionRequest {
+    model: String,
+    messages: Vec<ChatMessage>,
+    #[derivative(Default(value = "Some(0.5)"))]
+    temperature: Option<f32>,
+    // use temperature instead
+    // #[derivative(Default(value = "Some(0.5)"))]
+    top_p: Option<f32>,
+    #[derivative(Default(value = "Some(1)"))]
+    n: Option<usize>,
+    #[derivative(Default(value = "Some(false)"))]
+    stream: Option<bool>,
+    #[derivative(Default(value = "Some(vec![\"stop\".to_string()])"))]
+    stop: Option<Vec<String>>,
+    #[derivative(Default(value = "Some(32768)"))]
+    max_tokens: Option<usize>,
+    #[derivative(Default(value = "Some(0.0)"))]
+    presence_penalty: Option<f32>,
+    #[derivative(Default(value = "Some(0.0)"))]
+    frequency_penalty: Option<f32>,
+    #[derivative(Default(value = "Some(HashMap::new())"))]
+    logit_bias: Option<HashMap<String, i32>>,
+    #[derivative(Default(value = "Some(\"rust\".to_string())"))]
+    user: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CompletionResponse {
+    id: String,
+    object: String,
+    created: u128,
+    model: String,
+    usage: Usage,
+    choices: Vec<Choice>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Usage {
+    prompt_tokens: Option<u32>,
+    completion_tokens: Option<u32>,
+    total_tokens: Option<u32>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Choice {
+    message: ChatMessage,
+    index: usize,
+    logprobs: Option<HashMap<String, Vec<f32>>>,
+    finish_reason: Option<String>,
+    usage: Option<Usage>
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api_key = "";
+    let model_id = "gpt-3.5-turbo";
+    let url = format!("https://api.openai.com/v1/chat/completions");
+
+    let mut messages = vec![
+        ChatMessage { role: "system".to_owned(), content: "You are a helpful assistant.".to_owned() },
+        ChatMessage { role: "user".to_owned(), content: "What is the height of the Eiffel tower?".to_owned() }
+    ];
+
+    let request = CompletionRequest {
+        model: model_id.to_string(),
+        messages: messages.clone(),
+        temperature: Some(0.5),
+        user: Some("rust-agent".to_string()),
+        max_tokens: Some(10),
+        ..Default::default()
+    };
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::AUTHORIZATION, format!("Bearer {}", api_key))
+        .json(&request)
+        .send()
+        .await?
+        .json::<CompletionResponse>()
+        .await?;
+
+    for choice in response.choices {
+        messages.push(choice.message.clone());
+        let response_message = choice.message;
+        let response_text = response_message.content;
+        println!("{response_text:#?}");
+    }
+
+    Ok(())
+}
